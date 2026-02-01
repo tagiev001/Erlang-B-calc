@@ -9,6 +9,7 @@
 git clone https://github.com/tagiev001/Erlang-B-calc
 cd Erlang-B-calc
 gcc erlangb.c -o erlangb
+```
 ---
 
 ## Параметры
