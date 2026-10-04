@@ -1,0 +1,44 @@
+name: test branch pipeline
+
+on:
+  push:
+    branches: [ "test" ]
+  pull_request:
+    branches: [ "test" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Build
+        run: |
+          gcc -Wall -Wextra -O2 src/erlangb.c -o erlangb -lm
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: erlangb
+          path: erlangb
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: erlangb
+      - name: run tests
+        run: |
+          chmod +x ./erlangb
+          chmod +x ./test.sh 
+          bash test.sh ./erlangb 2>&1 | tee test-report.txt
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report.txt
+          path: test-report.txt
+          retention-days: 14
