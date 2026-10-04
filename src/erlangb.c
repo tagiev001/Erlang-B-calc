@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define MAX_CHANNELS 1000000
+#define MAX_CHANNELS 100000
 #define BISECT_ITERS 200
 
 double lost_tickets(double a, int v);
