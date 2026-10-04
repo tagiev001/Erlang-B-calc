@@ -15,6 +15,11 @@ jobs:
       - name: Build
         run: |
           gcc -Wall -Wextra -O2 src/erlangb.c -o erlangb -lm
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: erlangb
+          path: erlangb
   test:
     needs: build
     runs-on: ubuntu-latest
