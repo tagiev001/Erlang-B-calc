@@ -2,9 +2,9 @@ name: test branch pipeline
 
 on:
   push:
-    branches: [ "*" ]
+    branches: [ "test" ]
   pull_request:
-    branches: [ "*" ]
+    branches: [ "test" ]
 
 jobs:
   build:
@@ -34,4 +34,11 @@ jobs:
         run: |
           chmod +x ./erlangb
           chmod +x ./test.sh 
-          bash test.sh ./erlangb
+          bash test.sh ./erlangb 2>&1 | tee test-report.txt
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results.txt
+          retention-days: 14
