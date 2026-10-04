@@ -7,6 +7,8 @@ on:
     branches: [ "*" ]
 
 jobs:
+  show:
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -16,8 +18,16 @@ jobs:
         run: |
           gcc -Wall -Wextra -O2 src/erlangb.c -o erlangb -lm
   test:
+    needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: erlangb
       - name: run tests
         run: |
-          chmod +x test.sh && ./test.sh erlangb
+          chmod +x ./test.sh 
+          bash test.sh erlangb
