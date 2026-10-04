@@ -20,4 +20,4 @@ jobs:
     steps:
       - name: run tests
         run: |
-          ./test.sh erlangb
+          chmod +x && ./test.sh erlangb
