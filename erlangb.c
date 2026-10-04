@@ -1,231 +1,218 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
-float lost_tickets(float a, int v);
-float average_number_of_busy_channels(float E, float a);
-int required_number_of_channels(float E, float a);
-float required_load(float E, int v);
-float find_lost_via_m(float a, float m);
-float find_a_from_v_m(int v, float m);
-float find_a_for_m_e(float m, float E);
+#define MAX_CHANNELS 1000000
+#define BISECT_ITERS 200
 
-int help_message();
+double lost_tickets(double a, int v);
+double average_number_of_busy_channels(double E, double a);
+int required_number_of_channels(double E, double a);
+double required_load(double E, int v);
+double find_lost_via_m(double a, double m);
+double find_a_from_v_m(int v, double m);
+double find_a_for_m_e(double m, double E);
+int help_message(void);
 
+/* Поиск опции name в argv. 1 - найдена и значение корректное,
+   0 - не найдена, -1 - значение отсутствует или не число. */
+static int get_opt(int argc, char **argv, const char *name, double *out) {
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], name) == 0) {
+            if (i + 1 >= argc) return -1;
+            char *end;
+            double val = strtod(argv[i + 1], &end);
+            if (end == argv[i + 1] || *end != '\0') return -1;
+            *out = val;
+            return 1;
+        }
+    }
+    return 0;
+}
 
+static int invalid_input(void) {
+    printf("Invalid input\n");
+    help_message();
+    return 1;
+}
 
 int main(int argc, char **argv) {
-    if (argc == 1) {
-            help_message();
-            return 0;
-        }
-    for (int i = 1; i < argc; i++) {
-
-        if (strcmp(argv[i], "-h") == 0 && argc == 2) {
-            help_message();
-            return 0;
-        }
-        //  1 a v - E m
-        if (strcmp(argv[i], "-a") == 0 && strcmp(argv[i+2], "-v") == 0) {
-            float a = atof(argv[i+1]);
-            int v = atoi(argv[i+3]);
-
-            float E = lost_tickets(a, v);
-            float M = average_number_of_busy_channels(E, a);
-            
-            if (v < 0 || a < 0) {
-                printf("Invalid input\n");
-                help_message();
-                return 1;
-            }
-            printf("Percentage of lost %f\n", E);
-            printf("Average number of busy channels: %f\n", M);
-
-            return 0;
-        } 
-        // 2 a E - v m
-        if (strcmp(argv[i], "-a") == 0 && strcmp(argv[i+2], "-E") == 0) {
-            float a = atof(argv[i+1]);
-            float E = atof(argv[i+3]);
-
-            if ((E < 0 || E > 1) || a < 0) {
-                printf("Invalid input\n");
-                help_message();
-                return 1;
-            }
-            int v = required_number_of_channels(E, a);
-            float M = average_number_of_busy_channels(E, a);
-            printf("Required number of channels: %d\n", v);
-            printf("Average number of busy channels: %f\n", M);
-            return 0;
-
-        }
-        // 5 v E - a m
-        if (strcmp(argv[i], "-v") == 0 && strcmp(argv[i+2], "-E") == 0) {
-            int v = atoi(argv[i+1]);
-            float E = atof(argv[i+3]);
-            if ((E < 0 || E > 1) || v < 0) {
-                printf("Invalid input\n");
-                help_message();
-                return 1;
-            }
-            float a = required_load(E, v);
-            float M = average_number_of_busy_channels(E, a);
-
-            printf("Load: %f\n", a);
-            printf("Average number of busy channels: %f\n", M);
-            return 0;
-        }
-        // 3 a m - v E
-        if (strcmp(argv[i], "-a") == 0 && strcmp(argv[i+2], "-m") == 0) {
-            float a = atof(argv[i+1]);
-            float m = atof(argv[i+3]);
-            if ((a < 0 || m < 0) || (m > a)) {
-                printf("Invalid input\n");
-                help_message();
-                return 1;
-            }
-            float E = find_lost_via_m(a,  m);
-            int v = required_number_of_channels(E, a);
-            printf("Percentage of lost: %f\n", E);
-            printf("Required number of channels:%d\n", v);
-            return 0;
-        }
-        // 4 v m - a E
-        if (strcmp(argv[i], "-v") == 0 && strcmp(argv[i+2], "-m") == 0) {
-            int v = atoi(argv[i+1]);
-            float m = atof(argv[i+3]);
-            if ((v < 0 || m < 0) || (m > v)) {
-                printf("Invalid input\n");
-                help_message();
-                return 1;
-            }
-            float a = find_a_from_v_m(v, m);
-            float E = lost_tickets(a, v);
-            printf("Percentage of lost: %f\n", E);
-            printf("Load: %f\n", a);
-            
-            
-            return 0;
-        }
-        // 6 E m - a v
-        if (strcmp(argv[i], "-E") == 0 && strcmp(argv[i+2], "-m") == 0) {
-            float E = atof(argv[i+1]);
-            float m = atof(argv[i+3]);
-            float a = find_a_for_m_e(m, E);
-            int v = required_number_of_channels(E, a);
-            printf("%f\n%d\n", a,v);
-            
-        } 
+    if (argc == 1 || (argc == 2 && strcmp(argv[1], "-h") == 0)) {
+        help_message();
+        return 0;
     }
-}                
 
-float find_a_for_m_e(float m, float E) {
+    double a = 0, E = 0, m = 0, vd = 0;
+    int ra = get_opt(argc, argv, "-a", &a);
+    int rv = get_opt(argc, argv, "-v", &vd);
+    int rE = get_opt(argc, argv, "-E", &E);
+    int rm = get_opt(argc, argv, "-m", &m);
+
+    if (ra < 0 || rv < 0 || rE < 0 || rm < 0) return invalid_input();
+
+    /* Ровно две различные опции, и больше в командной строке ничего нет */
+    if (argc != 5 || ra + rv + rE + rm != 2) return invalid_input();
+
+    int v = 0;
+    if (rv) {
+        if (vd < 1 || vd > MAX_CHANNELS || vd != floor(vd)) return invalid_input();
+        v = (int)vd;
+    }
+    if (ra && a <= 0) return invalid_input();
+    if (rm && m <= 0) return invalid_input();
+    if (rE && (E <= 0 || E >= 1)) return invalid_input();
+
+    // 1: a v -> E m
+    if (ra && rv) {
+        double Ereal = lost_tickets(a, v);
+        double M = average_number_of_busy_channels(Ereal, a);
+        printf("Percentage of lost %f\n", Ereal);
+        printf("Average number of busy channels: %f\n", M);
+        return 0;
+    }
+    // 2: a E -> v m
+    if (ra && rE) {
+        int vr = required_number_of_channels(E, a);
+        if (vr < 0) return invalid_input();
+        double Ereal = lost_tickets(a, vr);   /* реальные потери при целом v */
+        double M = average_number_of_busy_channels(Ereal, a);
+        printf("Required number of channels: %d\n", vr);
+        printf("Real percentage of lost: %f\n", Ereal);
+        printf("Average number of busy channels: %f\n", M);
+        return 0;
+    }
+    // 5: v E -> a m
+    if (rv && rE) {
+        double ar = required_load(E, v);
+        double M = average_number_of_busy_channels(E, ar);
+        printf("Load: %f\n", ar);
+        printf("Average number of busy channels: %f\n", M);
+        return 0;
+    }
+    // 3: a m -> v E
+    if (ra && rm) {
+        if (m >= a) return invalid_input();
+        double Er = find_lost_via_m(a, m);
+        int vr = required_number_of_channels(Er, a);
+        if (vr < 0) return invalid_input();
+        printf("Percentage of lost: %f\n", Er);
+        printf("Required number of channels: %d\n", vr);
+        return 0;
+    }
+    // 4: v m -> a E
+    if (rv && rm) {
+        if (m >= v) return invalid_input();
+        double ar = find_a_from_v_m(v, m);
+        double Er = lost_tickets(ar, v);
+        printf("Percentage of lost: %f\n", Er);
+        printf("Load: %f\n", ar);
+        return 0;
+    }
+    // 6: E m -> a v
+    if (rE && rm) {
+        double ar = find_a_for_m_e(m, E);
+        int vr = required_number_of_channels(E, ar);
+        if (vr < 0) return invalid_input();
+        printf("Load: %f\n", ar);
+        printf("Required number of channels: %d\n", vr);
+        return 0;
+    }
+
+    return invalid_input();
+}
+
+double find_a_for_m_e(double m, double E) {
     return m / (1.0 - E);
 }
-float lost_tickets(float a, int v) {
-    int k = 1.0;
-    float r = 1.0;
-    float r_sum = 1.0;
-    float e;
-    while (k <= v) {
-       r = r * ((v - k + 1.0)/a);
-       r_sum += r;
-       k = k + 1.0;
+
+/* Формула Эрланга B через устойчивую рекуррентную форму:
+   B(0) = 1, B(k) = a*B(k-1) / (k + a*B(k-1)) */
+double lost_tickets(double a, int v) {
+    double b = 1.0;
+    for (int k = 1; k <= v; k++) {
+        b = a * b / (k + a * b);
     }
-    e = 1.0 / r_sum;
-
-    return e;
+    return b;
 }
 
-
-float average_number_of_busy_channels(float E, float a) {
-    float m = a * (1.0 - E);
-    return m;
-}
-//Бисекции
-float find_lost_via_m(float a, float m) {
-    float left = 0.0f;
-    float right = 1.0f;
-    float mid, fmid;
-    float eps = 1e-6;
-
-    while ((right - left) > eps) {
-        mid = (left + right) / 2.0f;
-        fmid = average_number_of_busy_channels(mid, a);
-
-        if (fmid > m) {
-            left = mid;
-        } else {
-            right = mid;
-        }
-    }
-
-    return (left + right) / 2.0f;
-    
+double average_number_of_busy_channels(double E, double a) {
+    return a * (1.0 - E);
 }
 
-//Бинарный поиск
-int required_number_of_channels(float E, float a) {
+/* m = a * (1 - E)  =>  E = 1 - m / a, бисекция не нужна */
+double find_lost_via_m(double a, double m) {
+    return 1.0 - m / a;
+}
+
+/* Бинарный поиск наименьшего v с потерями <= E.
+   Верхняя граница расширяется удвоением. -1, если не нашли. */
+int required_number_of_channels(double E, double a) {
     int left = 1;
-    int right = 10000;
-    int mid;
-    float loss;
+    int right = 1;
+
+    while (lost_tickets(a, right) > E) {
+        left = right + 1;
+        if (right > MAX_CHANNELS / 2) return -1;
+        right *= 2;
+    }
 
     while (left < right) {
-        mid = (left + right) / 2;
-        loss = lost_tickets(a, mid);
-
-        if (loss > E) {
-            // Каналов мало, вероятность отказа слишком велика
+        int mid = left + (right - left) / 2;
+        if (lost_tickets(a, mid) > E) {
             left = mid + 1;
         } else {
-            // Потери <= желаемого E — пробуем меньше каналов
             right = mid;
         }
     }
-
     return left;
 }
 
+/* Потери растут с нагрузкой: ищем a, при котором потери = E (бисекция) */
+double required_load(double E, int v) {
+    double left = 0.0;
+    double right = 1.0;
 
-float required_load(float E, int v) {
-    float a = 0.00001f;
-    while (lost_tickets(a, v) <= E) {
-        a = a + 0.01f;
+    while (lost_tickets(right, v) <= E) {
+        right *= 2.0;
     }
-
-    return a;
-}
-
-float find_a_from_v_m(int v, float m) {
-    float left = 0.000001f;
-    float right = v + 5000;    
-    float mid;
-    float eps = 1e-6;
-
-    while ((right - left) > eps) {
-        mid = (left + right) / 2.0f;
-
-        float E = lost_tickets(mid, v);     
-        float m_calc = mid * (1.0f - E);   
-
-        if (m_calc < m){
+    for (int i = 0; i < BISECT_ITERS; i++) {
+        double mid = (left + right) / 2.0;
+        if (lost_tickets(mid, v) <= E) {
             left = mid;
         } else {
             right = mid;
         }
     }
-
-    return (left + right) / 2.0f;
+    return (left + right) / 2.0;
 }
 
-int help_message() {
+/* Обслуженная нагрузка a*(1-B(a,v)) растёт с a и стремится к v (при m < v) */
+double find_a_from_v_m(int v, double m) {
+    double left = 0.0;
+    double right = 1.0;
+
+    while (right * (1.0 - lost_tickets(right, v)) < m) {
+        right *= 2.0;
+    }
+    for (int i = 0; i < BISECT_ITERS; i++) {
+        double mid = (left + right) / 2.0;
+        double m_calc = mid * (1.0 - lost_tickets(mid, v));
+        if (m_calc < m) {
+            left = mid;
+        } else {
+            right = mid;
+        }
+    }
+    return (left + right) / 2.0;
+}
+
+int help_message(void) {
     printf("erlangb is Erlang B calculator, it accepts the following arguments and their values as input:\n");
     printf("-h show this message\n");
-    printf("-a Load > 0, (a >= m)\n");
-    printf("-v Number of channels, integer (v >= m)\n");
-    printf("-m Average number of busy channels\n");
+    printf("-a Load > 0, (a > m)\n");
+    printf("-v Number of channels, integer (v > m)\n");
+    printf("-m Average number of busy channels, m > 0\n");
     printf("-E Percentage of lost tickets 0 < E < 1\n");
     printf("Here is all supported cases of use:\n");
     printf("-a <number> -v <number> -> E, m\n");
@@ -233,11 +220,11 @@ int help_message() {
     printf("-a <number> -m <number> -> v, E\n");
     printf("-v <number> -m <number> -> a, E\n");
     printf("-E <number> -m <number> -> a, v\n");
+    printf("-v <number> -E <number> -> a, m\n");
     printf("Example:\n");
     printf("Input:\n    -a 10 -v 5\n");
     printf("Output:\n");
     printf("    Percentage of lost 0.563952\n");
     printf("    Average number of busy channels: 4.360478\n");
     return 0;
-
 }
