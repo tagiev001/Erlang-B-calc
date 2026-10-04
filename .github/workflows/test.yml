@@ -3,6 +3,11 @@ name: test branch pipeline
 on:
   push:
     branches: [ "test" ]
+    paths:
+      - "src/**"
+      - "test.sh"
+      - ".github/workflows/test.yml"
+      
   pull_request:
     branches: [ "test" ]
 
@@ -40,5 +45,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-report.txt
-          path: test-report.txt
+          path: test-report .txt
           retention-days: 14

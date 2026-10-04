@@ -2,8 +2,12 @@ name: release pipeline
 
 on:
   push:
-    branches: [ "main" ]   # срабатывает при мердже в main
-
+    branches: [ "main" ]
+    paths:
+      - "src/**"
+      - "test.sh"
+      - ".github/workflows/release.yml"
+      
 permissions:
   contents: write          # нужно для создания тега и релиза
 
