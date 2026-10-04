@@ -32,5 +32,6 @@ jobs:
           name: erlangb
       - name: run tests
         run: |
+          chmod +x ./erlangb
           chmod +x ./test.sh 
           bash test.sh ./erlangb
