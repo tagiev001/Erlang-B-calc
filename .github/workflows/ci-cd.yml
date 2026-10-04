@@ -1,0 +1,23 @@
+name: test branch pipeline
+
+on:
+  push:
+    branches: [ "*" ]
+  pull_request:
+    branches: [ "*" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Build
+        run: |
+          gcc -Wall -Wextra -O2 src/erlangb.c -o erlangb
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: run tests
+        run: |
+          ./test.sh erlangb
