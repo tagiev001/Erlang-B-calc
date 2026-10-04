@@ -1,0 +1,41 @@
+name: release pipeline
+
+on:
+  push:
+    branches: [ "main" ]   # срабатывает при мердже в main
+
+permissions:
+  contents: write          # нужно для создания тега и релиза
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: gcc -Wall -Wextra -O2 src/erlangb.c -o erlangb -lm
+
+      - name: Run tests
+        shell: bash
+        run: |
+          bash test.sh ./erlangb 2>&1 | tee test-results.txt
+
+      - name: Prepare release files
+        run: |
+          mv erlangb erlangb-linux-x86_64
+          sha256sum erlangb-linux-x86_64 > SHA256SUMS.txt
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v1.0.${{ github.run_number }}"
+          gh release create "$TAG" \
+            erlangb-linux-x86_64 \
+            SHA256SUMS.txt \
+            test-results.txt \
+            --target "$GITHUB_SHA" \
+            --title "erlangb $TAG" \
+            --generate-notes
